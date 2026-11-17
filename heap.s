@@ -27,6 +27,11 @@ setup_brk:
     ret
 
 dismiss_brk:
+    movq heap_start(%rip), %rdi   # Endereço inicial a restaurar
+    movq $12, %rax               # Syscall brk
+    syscall
+
+    movq %rax, heap_top(%rip)    # Guarda o fim retornado
     ret
 
 memory_alloc:

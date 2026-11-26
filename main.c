@@ -35,8 +35,10 @@ int main(void)
     assert(bloco_uso(grande) == 1 && bloco_tamanho(grande) == 50);
     assert((char *)grande == (char *)pequeno + 29);
 
-    *((unsigned char *)pequeno - 9) = 0;
-    *((unsigned char *)grande - 9) = 0;
+    assert(memory_free(pequeno) == 0);
+    assert(memory_free(grande) == 0);
+    assert(bloco_uso(pequeno) == 0 && bloco_tamanho(pequeno) == 20);
+    assert(bloco_uso(grande) == 0 && bloco_tamanho(grande) == 50);
 
     pior = memory_alloc(10, 0);
     assert(pior == grande);

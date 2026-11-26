@@ -138,6 +138,8 @@ memory_alloc_whole:
 	ret
 
 memory_free:
+	movb $0, -9(%rdi)
+	xorl %eax, %eax
 	ret
 
 .section .note.GNU-stack,"",@progbits

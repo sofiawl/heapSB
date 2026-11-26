@@ -33,10 +33,3 @@ O ponteiro devolvido por `memory_alloc` aponta para DADOS, nove bytes depois do 
 Se o bloco livre for maior que o pedido, a sobra só vira outro bloco quando couber um registro novo e pelo menos 1 byte de dados. O registro tem 9 bytes, então a sobra precisa ter no mínimo 10 bytes. Sem essa sobra, devolve o bloco inteiro.
 
 Se não houver bloco livre adequado, o bloco novo entra no final da heap.
-
-
-## O que falta
-- [ ] `memory_alloc` ignora `strategy` e sempre cria um bloco no fim. A busca best-fit e worst-fit existe, mas ainda não é usada, e a divisão da sobra não está feita
-- [ ] `memory_free` ainda não marca o bloco
-- [ ] `memory_free` ainda não marca o bloco
-- [ ] `main.c` só chama `setup_brk` e `dismiss_brk`. Falta alocar, liberar e conferir

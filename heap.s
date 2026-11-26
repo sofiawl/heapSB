@@ -1,14 +1,6 @@
 .section .bss
-.balign 8
-
-.globl heap_start
-.globl heap_top
-
-heap_start:
-	.zero 8
-
-heap_top:
-	.zero 8
+.lcomm heap_start 8           # início da heap
+.lcomm heap_top 8             # fim atual da heap
 
 .section .text
 
@@ -22,16 +14,16 @@ setup_brk:
 	movq $0, %rdi                 # brk(0) devolve o endereço atual
 	syscall
 
-	movq %rax, heap_start(%rip)
-	movq %rax, heap_top(%rip)     # heap começa vazia
+	movq %rax, heap_start
+	movq %rax, heap_top           # heap começa vazia
 	ret
 
 dismiss_brk:
-	movq heap_start(%rip), %rdi   # volta o brk pro início
+	movq heap_start, %rdi         # volta o brk pro início
 	movq $12, %rax
 	syscall
 
-	movq %rax, heap_top(%rip)
+	movq %rax, heap_top
 	ret
 
 new_block_at_end:
@@ -39,7 +31,7 @@ new_block_at_end:
 	jl new_block_at_end_fail
 
 	movq %rdi, %r8                # r8 = tamanho pedido
-	movq heap_top(%rip), %r9      # r9 = onde o bloco novo começa
+	movq heap_top, %r9            # r9 = onde o bloco novo começa
 	movq %r9, %r10
 	addq $9, %r10
 	addq %r8, %r10                # r10 = novo fim da heap
@@ -53,7 +45,7 @@ new_block_at_end:
 
 	movb $1, (%r9)                # em uso
 	movq %r8, 1(%r9)              # tamanho
-	movq %r10, heap_top(%rip)
+	movq %r10, heap_top
 	movq %r9, %rax
 	addq $9, %rax                 # devolve o endereço dos dados
 	ret
@@ -62,86 +54,97 @@ new_block_at_end_fail:
 	movq $0, %rax
 	ret
 
+# procura um bloco livre que caiba (rdi = tamanho, sil = estratégia)
+# devolve em rax o início do registro (ou 0) e em r10 o tamanho dele
 find_block:
-	movq heap_start(%rip), %r8		# Atual = heap_start	
-	movq $0, %rax					# Melhor = 0
+	movq heap_start, %r8          # bloco atual
+	movq $0, %rax                 # melhor bloco até agora
 
 find_block_loop:
-	# parada: se atual >= heap_top, vai para find_block_end
-	cmpq heap_top(%rip), %r8
+	cmpq heap_top, %r8            # chegou no fim da heap
 	jge find_block_end
 
-	movq 1(%r8), %r9		# R9 = tamanho do bloco
+	movq 1(%r8), %r9              # tamanho do bloco atual
 
-	# confere se está livre, se não, vai para find_block_next
-	cmpb $0, (%r8)
+	cmpb $0, (%r8)                # ocupado, pula
 	jne find_block_next
 
-	# confere se cabe, se não, vai para find_block_next
-	cmpq %rdi, %r9
+	cmpq %rdi, %r9                # não cabe, pula
 	jl find_block_next
 
-	# confere se é o primeiro, se sim, vai para find_block_take
-	cmpq $0, %rax
+	cmpq $0, %rax                 # primeiro que cabe
 	je find_block_take
 
-	# verifica se é best ou worst na entrada
-	cmpb $0, %sil		# Pega o último byte do rsi pois o resto pode ser lixo
+	cmpb $0, %sil                 # strategy é unsigned char, só o byte baixo vale
 	je find_block_worst
 
 find_block_best:
-	# se tamanho < tam_melhor, vai para find_block_take
-	cmpq %r10, %r9
+	cmpq %r10, %r9                # menor que o melhor até agora
 	jl find_block_take
-	# senão, vai para find_block_next
 	jmp find_block_next
 
 find_block_worst:
-	# se tamanho > tam_melhor, vai para find_block_take
-	cmpq %r10, %r9
+	cmpq %r10, %r9                # maior que o melhor até agora
 	jg find_block_take
-	# senão, cai em find_block_next
 
 find_block_next:
 	addq $9, %r8
-	addq %r9, %r8					# Atual = atual + 9 + tamanho
+	addq %r9, %r8                 # próximo = atual + 9 + tamanho
 	jmp find_block_loop
 
 find_block_take:
-	movq %r8, %rax				# Melhor = atual
-	movq %r9, %r10				# Tam_melhor = tamanho
+	movq %r8, %rax
+	movq %r9, %r10
 	jmp find_block_next
 
 find_block_end:
 	ret
 
 memory_alloc:
-	call find_block
-	testq %rax, %rax
-	jz new_block_at_end
+	cmpq $0, %rdi                 # tamanho grande demais
+	jl memory_alloc_fail
 
+	call find_block
+	cmpq $0, %rax
+	jne memory_alloc_reuse
+
+	call new_block_at_end         # nenhum bloco livre serve
+	ret
+
+memory_alloc_reuse:
 	movq %r10, %rcx
-	subq %rdi, %rcx
-	cmpq $10, %rcx			# sobra mínima: registro (9) + 1 byte
-	jb memory_alloc_whole
+	subq %rdi, %rcx               # rcx = sobra
+	cmpq $10, %rcx                # precisa caber registro (9) + 1 byte
+	jl memory_alloc_whole
 
 	movq %rdi, 1(%rax)
 	movb $1, (%rax)
-	leaq 9(%rax, %rdi), %rdx
+	movq %rax, %rdx
+	addq $9, %rdx
+	addq %rdi, %rdx               # rdx = registro da sobra
 	movb $0, (%rdx)
 	subq $9, %rcx
-	movq %rcx, 1(%rdx)
-	leaq 9(%rax), %rax
+	movq %rcx, 1(%rdx)            # sobra vira bloco livre
+	addq $9, %rax
 	ret
 
 memory_alloc_whole:
-	movb $1, (%rax)
-	leaq 9(%rax), %rax
+	movb $1, (%rax)               # sobra pequena, usa o bloco todo
+	addq $9, %rax
+	ret
+
+memory_alloc_fail:
+	movq $0, %rax
 	ret
 
 memory_free:
-	movb $0, -9(%rdi)
-	xorl %eax, %eax
+	cmpq $0, %rdi
+	je memory_free_fail
+
+	movb $0, -9(%rdi)             # marca como livre
+	movq $0, %rax
 	ret
 
-.section .note.GNU-stack,"",@progbits
+memory_free_fail:
+	movq $-1, %rax
+	ret

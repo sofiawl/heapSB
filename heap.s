@@ -114,9 +114,28 @@ find_block_end:
 	ret
 
 memory_alloc:
-	# Provisório: ignora a estratégia (%rsi) e sempre cria um bloco no fim.
-	# Versão final: find_block -> se achou, use_block -> senão new_block_at_end.
-	jmp new_block_at_end          # bytes já está em %rdi; o ret dela volta ao chamador
+	call find_block
+	testq %rax, %rax
+	jz new_block_at_end
+
+	movq %r10, %rcx
+	subq %rdi, %rcx
+	cmpq $10, %rcx			# sobra mínima: registro (9) + 1 byte
+	jb memory_alloc_whole
+
+	movq %rdi, 1(%rax)
+	movb $1, (%rax)
+	leaq 9(%rax, %rdi), %rdx
+	movb $0, (%rdx)
+	subq $9, %rcx
+	movq %rcx, 1(%rdx)
+	leaq 9(%rax), %rax
+	ret
+
+memory_alloc_whole:
+	movb $1, (%rax)
+	leaq 9(%rax), %rax
+	ret
 
 memory_free:
 	ret

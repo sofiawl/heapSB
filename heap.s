@@ -18,46 +18,48 @@ heap_top:
 .globl memory_free
 
 setup_brk:
-	movq $12, %rax                # Número da syscall brk
-	xorq %rdi, %rdi               # consultar endereço atual
-	syscall                      # Endereço retornado em rax
+	movq $12, %rax                # brk
+	movq $0, %rdi                 # brk(0) devolve o endereço atual
+	syscall
 
-	movq %rax, heap_start(%rip)   # Guarda o início da região
-	movq %rax, heap_top(%rip)     # fim igual ao início
+	movq %rax, heap_start(%rip)
+	movq %rax, heap_top(%rip)     # heap começa vazia
 	ret
 
 dismiss_brk:
-	movq heap_start(%rip), %rdi   # Endereço inicial a restaurar
-	movq $12, %rax               # Syscall brk
+	movq heap_start(%rip), %rdi   # volta o brk pro início
+	movq $12, %rax
 	syscall
 
-	movq %rax, heap_top(%rip)    # Guarda o fim retornado
+	movq %rax, heap_top(%rip)
 	ret
 
 new_block_at_end:
-	movq %rdi, %r8                # r8 = bytes solicitados
-	movq heap_top(%rip), %r9      # r9 = antigo heap_top
+	cmpq $0, %rdi                 # tamanho grande demais
+	jl new_block_at_end_fail
+
+	movq %rdi, %r8                # r8 = tamanho pedido
+	movq heap_top(%rip), %r9      # r9 = onde o bloco novo começa
 	movq %r9, %r10
-	addq $9, %r10                 # r10 = heap_top + 9
-	jc new_block_at_end_fail      # Overflow: falha
-	addq %r8, %r10                # r10 = novo fim (heap_top + 9 + bytes)
-	jc new_block_at_end_fail      # Overflow: falha
+	addq $9, %r10
+	addq %r8, %r10                # r10 = novo fim da heap
 
-	movq $12, %rax                # Syscall brk
-	movq %r10, %rdi               # Novo fim solicitado
-	syscall                       # Altera rax, rcx e r11 (r8-r10 preservados)
+	movq $12, %rax
+	movq %r10, %rdi
+	syscall                       # muda rax, rcx e r11
 
-	cmpq %r10, %rax               # brk retornou o endereço pedido?
+	cmpq %r10, %rax               # se não deu o que pedimos, falhou
 	jne new_block_at_end_fail
 
-	movb $1, (%r9)                # Cabeçalho: bloco ocupado (offset 0)
-	movq %r8, 1(%r9)              # Cabeçalho: tamanho (offset 1)
-	movq %r10, heap_top(%rip)     # Atualiza o fim da heap
-	leaq 9(%r9), %rax             # Retorna o endereço dos dados
+	movb $1, (%r9)                # em uso
+	movq %r8, 1(%r9)              # tamanho
+	movq %r10, heap_top(%rip)
+	movq %r9, %rax
+	addq $9, %rax                 # devolve o endereço dos dados
 	ret
 
 new_block_at_end_fail:
-	xorq %rax, %rax               # Falha: retorna 0
+	movq $0, %rax
 	ret
 
 find_block:

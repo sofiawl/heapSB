@@ -1,12 +1,13 @@
 .PHONY: all clean
 
-all: programa
+all: testes
 
+# usamos --noexecstack para não ter aviso do ligador sobre pilha executável
 heap.o: heap.s
-	as -g heap.s -o heap.o
+	as -g --noexecstack heap.s -o heap.o
 
-programa: main.c heap.h heap.o
-	gcc -g -Wall -Wextra -no-pie main.c heap.o -o prog
+testes: main.c heap.h heap.o
+	gcc -g -Wall -Wextra -no-pie main.c heap.o -o testes
 
 clean:
-	rm -f heap.o programa
+	rm -f heap.o testes

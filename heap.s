@@ -1,6 +1,7 @@
 .section .bss
-.lcomm heap_start 8           # início da heap
-.lcomm heap_top 8             # fim atual da heap
+.globl original_brk
+.lcomm original_brk 8			# início da heap (nome usado no teste do prof)
+.lcomm heap_top 8				# fim atual da heap
 
 .section .text
 
@@ -14,12 +15,12 @@ setup_brk:
 	movq $0, %rdi                 # brk(0) devolve o endereço atual
 	syscall
 
-	movq %rax, heap_start
+	movq %rax, original_brk
 	movq %rax, heap_top           # heap começa vazia
 	ret
 
 dismiss_brk:
-	movq heap_start, %rdi         # volta o brk pro início
+	movq original_brk, %rdi         # volta o brk pro início
 	movq $12, %rax
 	syscall
 
@@ -57,8 +58,8 @@ new_block_at_end_fail:
 # procura um bloco livre que caiba (rdi = tamanho, sil = estratégia)
 # devolve em rax o início do registro (ou 0) e em r10 o tamanho dele
 find_block:
-	movq heap_start, %r8          # bloco atual
-	movq $0, %rax                 # melhor bloco até agora
+	movq original_brk, %r8			# bloco atual
+	movq $0, %rax					# melhor bloco até agora
 
 find_block_loop:
 	cmpq heap_top, %r8            # chegou no fim da heap

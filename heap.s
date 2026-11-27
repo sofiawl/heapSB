@@ -139,14 +139,21 @@ memory_alloc_fail:
 	ret
 
 memory_free:
-	cmpq $0, %rdi
-	je memory_free_fail
+	movq original_brk, %rax
+	addq $9, %rax
 
-	movb $0, -9(%rdi)             # marca como livre
-	movq $0, %rax
+	# falha se o ponteiro está fora da heap
+	cmpq %rax, %rdi				
+	jl memory_free_fail			# está antes da heap	
+
+	cmpq heap_top, %rdi
+	jge memory_free_fail		# está depois da heap
+
+	movb $0, -9(%rdi)			# marca como livre
+	movq $1, %rax
 	ret
 
 memory_free_fail:
-	movq $-1, %rax
+	movq $0, %rax
 	ret
 	

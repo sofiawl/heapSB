@@ -145,7 +145,8 @@ memory_free_loop:
 	cmpq heap_top, %r8            # chegou no fim sem achar
 	jae memory_free_fail
 
-	leaq 9(%r8), %r9              # r9 = ponteiro de dados do bloco atual
+	movq %r8, %r9
+	addq $9, %r9                  # r9 = ponteiro de dados do bloco atual
 	cmpq %rdi, %r9                # é este bloco?
 	je memory_free_found
 

@@ -63,7 +63,7 @@ find_block:
 
 find_block_loop:
 	cmpq heap_top, %r8            # chegou no fim da heap
-	jge find_block_end
+	jae find_block_end
 
 	movq 1(%r8), %r9              # tamanho do bloco atual
 
@@ -71,7 +71,7 @@ find_block_loop:
 	jne find_block_next
 
 	cmpq %rdi, %r9                # não cabe, pula
-	jl find_block_next
+	jb find_block_next
 
 	cmpq $0, %rax                 # primeiro que cabe
 	je find_block_take
@@ -81,12 +81,12 @@ find_block_loop:
 
 find_block_best:
 	cmpq %r10, %r9                # menor que o melhor até agora
-	jl find_block_take
+	jb find_block_take
 	jmp find_block_next
 
 find_block_worst:
 	cmpq %r10, %r9                # maior que o melhor até agora
-	jg find_block_take
+	ja find_block_take
 
 find_block_next:
 	addq $9, %r8
@@ -139,21 +139,25 @@ memory_alloc_fail:
 	ret
 
 memory_free:
-	movq original_brk, %rax
-	addq $9, %rax
+	movq original_brk, %r8        # bloco atual
 
-	# falha se o ponteiro está fora da heap
-	cmpq %rax, %rdi				
-	jl memory_free_fail			# está antes da heap	
+memory_free_loop:
+	cmpq heap_top, %r8            # chegou no fim sem achar
+	jae memory_free_fail
 
-	cmpq heap_top, %rdi
-	jge memory_free_fail		# está depois da heap
+	leaq 9(%r8), %r9              # r9 = ponteiro de dados do bloco atual
+	cmpq %rdi, %r9                # é este bloco?
+	je memory_free_found
 
-	movb $0, -9(%rdi)			# marca como livre
+	addq 1(%r8), %r9              # r9 = atual + 9 + tamanho
+	movq %r9, %r8                 # vai para o próximo bloco
+	jmp memory_free_loop
+
+memory_free_found:
+	movb $0, (%r8)                # marca como livre
 	movq $1, %rax
 	ret
 
 memory_free_fail:
 	movq $0, %rax
 	ret
-	
